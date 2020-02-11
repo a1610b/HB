@@ -6,8 +6,8 @@ from datetime import datetime
 import sqlite3 as db
 import time
 
-def getDataFromsql(item = '*', name = 'data'):
-    con = db.connect('data\\'+ name + '.sqlite')
+def getDataFromsql(item = '*', name = 'stock_data'):
+    con = db.connect('D:\\Data\\'+ name + '.sqlite')
     #con = db.connect('C:\\Users\\hp\\OneDrive - pku.edu.cn\\实习\\华宝\\PE-ROE Project\\code\\data.sqlite')
     cur = con.cursor()
     data = {}
@@ -82,7 +82,7 @@ def download_all_market_data(sqlname = 'data'):
                 set(pro.stock_basic(exchange='', list_status='P', 
                                     fields='ts_code,symbol,name,area,industry,list_date')['ts_code'])
 
-    con = db.connect('data\\'+sqlname+'.sqlite')
+    con = db.connect('D:\\Data\\'+sqlname+'.sqlite')
     cur = con.cursor()
 
     count = 0
