@@ -33,26 +33,6 @@ def get_industry_stock_list():
         industry_stockList[i] = pro.index_member(index_code= i)
     return industry_stockList
 
-def getDataFromTushare():
-    stockData = {}
-    ts.set_token('267addf63a14adcfc98067fc253fbd72a728461706acf9474c0dae29')
-    pro = ts.pro_api()
-    data = pro.stock_basic(exchange='', list_status='L', fields='ts_code,symbol, name,area,industry,list_date')
-    stockList = data['ts_code']
-    for i in stockList:
-
-        #由于每次最多只能得到4000条数据，故最多只到2002年的数据
-        startDate = '20090101'
-        endDate = '20190701'
-
-        stockData[i] = pro.daily(ts_code=i, start_date=startDate, end_date=endDate)[[
-            'trade_date', 'open', 'high', 'low', 'close', 'amount'
-        ]]
-        if stockData[i].shape[0] < 100:
-            stockData.pop(i)
-    return stockData
-
-
 #从本地csv导入数据
 #csv中只有一列为价格，价格应为从新到旧
 def getDataFromeCSV():
@@ -68,8 +48,7 @@ def download_all_market_data(sqlname = 'data'):
     ts.set_token('267addf63a14adcfc98067fc253fbd72a728461706acf9474c0dae29')
     pro = ts.pro_api()
 
-    #从2009年1月1日开始到当前日期
-    startDate = '20090101'
+    #从数据库有数据开始到当前日期
     endDate = time.strftime("%Y%m%d", time.localtime())
 
     #读取全市场的股票信息
@@ -87,21 +66,24 @@ def download_all_market_data(sqlname = 'data'):
 
     count = 0
     for i in stockList:
-        #避免过多调用函数
+        #避免过于频繁的调用爬虫
+        '''
         count += 1
         if count % 100 == 0:
             time.sleep(60)
+        '''
+        
+        df1 = pro.daily(ts_code=i)           #基本数据
+        df2 = pro.daily_basic(ts_code=i)     #基本面数据
+        df3 = pro.adj_factor(ts_code=i)      #复权因子
+        df4 = pro.moneyflow(ts_code=i)       #资金流向
+        df5 = pro.margin_detail(ts_code=i)   #融资融券
 
-        #读入基本数据
-        df1 = pro.daily(ts_code=i, start_date=startDate, end_date=endDate)[[
-            'trade_date', 'open', 'high', 'low', 'close', 'amount'
-        ]]
-        #读入基本面数据
-        df2 = pro.daily_basic(ts_code=i,
-                                  start_date=startDate,
-                                  end_date=endDate,
-                                  fields='trade_date, pe_ttm, pb, turnover_rate, turnover_rate_f, ps_ttm')
-        stockData = df1.merge(df2, right_on='trade_date', left_on='trade_date')
+        stockData = df1[set(df1.columns) - {'ts_code'}].merge(df2[set(df2.columns) - {'ts_code', 'close'}], how = 'left', right_on='trade_date', left_on='trade_date')
+        stockData = stockData.merge(df3[['trade_date', 'adj_factor']], how = 'left', right_on='trade_date', left_on='trade_date')
+        stockData = stockData.merge(df4[set(df4.columns) - {'ts_code'}], how = 'left', right_on='trade_date', left_on='trade_date')
+        stockData = stockData.merge(df5[set(df5.columns) - {'ts_code'}], how = 'left', right_on='trade_date', left_on='trade_date')
+        stockData.dropna(how = 'all', axis = 1, inplace= True)
         print(i)
         #写入数据库
         stockData.to_sql(name = i, con = con, if_exists='replace', index = None)
