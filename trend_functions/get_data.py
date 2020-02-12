@@ -31,65 +31,110 @@ def get_industry_stock_list():
         industry_stockList[i] = pro.index_member(index_code= i)
     return industry_stockList
 
-#从本地csv导入数据
-#csv中只有一列为价格，价格应为从新到旧
+
 def getDataFromeCSV():
+
+    # 从本地csv导入数据
+    # csv中只有一列为价格，价格应为从新到旧
+
     filename = input('filename: ')
     data = {}
     data['first'] = pd.read_csv(filename)
     data['first'].columns = ['close']
-    data['first']['trade_date'] = pd.date_range(start='2019-1-09',
-        periods=data['first'].shape[0], freq='-1D')
+    data['first']['trade_date'] = pd.date_range(
+        start='2019-1-09',
+        periods=data['first'].shape[0],
+        freq='-1D'
+        )
     return data
 
-def download_all_market_data(sqlname = 'data'):
+
+def download_all_market_data(sqlname='data'):
+
     ts.set_token('267addf63a14adcfc98067fc253fbd72a728461706acf9474c0dae29')
     pro = ts.pro_api()
 
-    #从数据库有数据开始到当前日期
+    # 从数据库有数据开始到当前日期
+    # 读取全市场的股票信息
 
-    #读取全市场的股票信息
-    #读取全市场的股票信息
-
-    stockList = set(pro.stock_basic(exchange='', list_status='D', 
-                                    fields='ts_code,symbol,name,area,industry,list_date')['ts_code']) | \
-                set(pro.stock_basic(exchange='', list_status='L', 
-                                    fields='ts_code,symbol,name,area,industry,list_date')['ts_code']) | \
-                set(pro.stock_basic(exchange='', list_status='P', 
-                                    fields='ts_code,symbol,name,area,industry,list_date')['ts_code'])
+    stockList = set(pro.stock_basic(exchange='',
+                                    list_status='D',
+                                    fields='ts_code')['ts_code'])
+                | set(pro.stock_basic(exchange='',
+                                      list_status='L',
+                                      fields='ts_code')['ts_code'])
+                | set(pro.stock_basic(exchange='',
+                                      list_status='P',
+                                      fields='ts_code')['ts_code'])
 
     con = db.connect('D:\\Data\\'+sqlname+'.sqlite')
     cur = con.cursor()
 
-    #count = 0
-    stockList = list(stockList)
-    a = stockList.index('688080.SH')
-    stockList = stockList[a:]
+    count = 0
+    stockList = list(stockList)[::-1]
     for i in stockList:
-        #避免过于频繁的调用爬虫
-        '''
-        count += 1
-        if count % 100 == 0:
-            time.sleep(60)
-        '''
-        
-        df1 = pro.daily(ts_code=i)           #基本数据
-        df2 = pro.daily_basic(ts_code=i)     #基本面数据
-        df3 = pro.adj_factor(ts_code=i)      #复权因子
-        df4 = pro.moneyflow(ts_code=i)       #资金流向
-        df5 = pro.margin_detail(ts_code=i)   #融资融券
+        print(i)
+        # 避免过于频繁的调用爬虫
 
-        stockData = df1[set(df1.columns) - {'ts_code'}].merge(df2[set(df2.columns) - {'ts_code', 'close'}], how = 'left', right_on='trade_date', left_on='trade_date')
-        stockData = stockData.merge(df3[['trade_date', 'adj_factor']], how = 'left', right_on='trade_date', left_on='trade_date')
-        stockData = stockData.merge(df4[set(df4.columns) - {'ts_code'}], how = 'left', right_on='trade_date', left_on='trade_date')
-        stockData = stockData.merge(df5[set(df5.columns) - {'ts_code'}], how = 'left', right_on='trade_date', left_on='trade_date')
-        stockData.dropna(how = 'all', axis = 1, inplace= True)
-        print(stockData.head())
-        #写入数据库
-        stockData.to_sql(name = i, con = con, if_exists='replace', index = None)
+        count += 1
+        if count % 10 == 0:
+            time.sleep(10)
+
+        df1 = pro.daily(ts_code=i)           # 基本数据
+        df2 = pro.daily_basic(ts_code=i)     # 基本面数据
+        df3 = pro.adj_factor(ts_code=i)      # 复权因子
+        df4 = pro.moneyflow(ts_code=i)       # 资金流向
+        df5 = pro.margin_detail(ts_code=i)   # 融资融券
+
+        stockData = df1[set(df1.columns) - {'ts_code'}].merge(
+                df2[set(df2.columns) - {'ts_code', 'close'}],
+                how='left',
+                right_on='trade_date',
+                left_on='trade_date'
+                )
+        stockData = stockData.merge(
+                df3[['trade_date', 'adj_factor']],
+                how='left',
+                right_on='trade_date',
+                left_on='trade_date'
+                )
+        stockData = stockData.merge(
+                df4[set(df4.columns) - {'ts_code'}],
+                how='left',
+                right_on='trade_date',
+                left_on='trade_date'
+                )
+        stockData = stockData.merge(
+                df5[set(df5.columns) - {'ts_code'}],
+                how='left',
+                right_on='trade_date',
+                left_on='trade_date'
+                )
+        stockData.dropna(how='all', axis=1, inplace=True)
+
+        if stockData.shape[0] == 0:
+            # 如果是当日上市新股，则忽略
+            continue
+
+        # 写入数据库
+        if 'trade_date' in stockData.columns:
+            stockData.set_index('trade_date', inplace=True)
+            stockData.to_sql(
+                name=i,
+                con=con,
+                if_exists='replace',
+                index=True
+                )
+        else:
+            stockData.to_sql(name=i,
+                             con=con,
+                             if_exists='replace',
+                             index=False
+                             )
         con.commit()
     cur.close()
     con.close()
+
 
 '''
 def get_index_data(index, sqlname = 'data', date = time.strftime("%Y%m%d", time.localtime())):
@@ -129,9 +174,11 @@ def get_index_data(index, sqlname = 'data', date = time.strftime("%Y%m%d", time.
     con.close()
 '''
 
+
 def main():
     download_all_market_data()
     print('done')
+
 
 if __name__ == '__main__':
     main()
