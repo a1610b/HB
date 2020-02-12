@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
-import datetime
 import tushare as ts
-from datetime import datetime
 import sqlite3 as db
 import time
 
@@ -49,7 +47,6 @@ def download_all_market_data(sqlname = 'data'):
     pro = ts.pro_api()
 
     #从数据库有数据开始到当前日期
-    endDate = time.strftime("%Y%m%d", time.localtime())
 
     #读取全市场的股票信息
     #读取全市场的股票信息
@@ -64,7 +61,10 @@ def download_all_market_data(sqlname = 'data'):
     con = db.connect('D:\\Data\\'+sqlname+'.sqlite')
     cur = con.cursor()
 
-    count = 0
+    #count = 0
+    stockList = list(stockList)
+    a = stockList.index('688080.SH')
+    stockList = stockList[a:]
     for i in stockList:
         #避免过于频繁的调用爬虫
         '''
@@ -84,7 +84,7 @@ def download_all_market_data(sqlname = 'data'):
         stockData = stockData.merge(df4[set(df4.columns) - {'ts_code'}], how = 'left', right_on='trade_date', left_on='trade_date')
         stockData = stockData.merge(df5[set(df5.columns) - {'ts_code'}], how = 'left', right_on='trade_date', left_on='trade_date')
         stockData.dropna(how = 'all', axis = 1, inplace= True)
-        print(i)
+        print(stockData.head())
         #写入数据库
         stockData.to_sql(name = i, con = con, if_exists='replace', index = None)
         con.commit()

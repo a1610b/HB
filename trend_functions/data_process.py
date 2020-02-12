@@ -1,15 +1,9 @@
-import numpy as np
 import pandas as pd
-import datetime
-import sqlite3 as db
-from datetime import datetime
-from datetime import timedelta
 import sqlite3 as db
 import math
 import time
 from sklearn.tree import export_graphviz
 from sklearn.tree import DecisionTreeClassifier
-from sklearn import tree
 from sklearn.model_selection import train_test_split
 import pydotplus
 import warnings
