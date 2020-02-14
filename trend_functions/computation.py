@@ -1,25 +1,52 @@
+# -*- coding: utf-8 -*-
+"""
+Created on 2019/7/10
 
-import numpy as np
-import pandas as pd
-import datetime
-import tushare as ts
-from datetime import datetime
-from datetime import timedelta
+@author: Tony She
+
+E-mail: tony_she@yahoo.com
+
+This module provides socket operations and some related functions.
+On Unix, it supports IP (Internet Protocol) and Unix domain sockets.
+On other systems, it only supports IP. Functions specific for a
+socket are available as methods of the socket object.
+
+Functions:
+
+socket() -- create a new socket object
+socketpair() -- create a pair of new socket objects [*]
+fromfd() -- create a socket object from an open file descriptor [*]
+fromshare() -- create a socket object from data received from socket.share() [*]
+gethostname() -- return the current hostname
+gethostbyname() -- map a hostname to its IP number
+gethostbyaddr() -- map an IP number or hostname to DNS info
+getservbyname() -- map a service name and a protocol name to a port number
+getprotobyname() -- map a protocol name (e.g. 'tcp') to a number
+ntohs(), ntohl() -- convert 16, 32 bit int from network to host byte order
+htons(), htonl() -- convert 16, 32 bit int from host to network byte order
+inet_aton() -- convert IP addr string (123.45.67.89) to 32-bit packed format
+inet_ntoa() -- convert 32-bit packed format IP to string (123.45.67.89)
+socket.getdefaulttimeout() -- get the default timeout value
+socket.setdefaulttimeout() -- set the default timeout value
+create_connection() -- connects to an address, with an optional timeout and
+                       optional source address.
+"""
+
 import sqlite3 as db
 import math
 import time
+
+import pandas as pd
+import tushare as ts
 from sklearn.tree import export_graphviz
 from sklearn.tree import DecisionTreeClassifier
-from sklearn import tree
 from sklearn.model_selection import train_test_split
 import pydotplus
-import warnings
 
 
-#从本地数据库导入数据
+# 从本地数据库导入数据
 def getDataFromsql():
-    con = db.connect('D:\PB-ROE project\Code\data.sqlite')
-    #con = db.connect('C:\\Users\\hp\\OneDrive - pku.edu.cn\\实习\\华宝\\PE-ROE Project\\code\\data.sqlite')
+    con = db.connect('D:\\Data\\data.sqlite')
     cur = con.cursor()
     data = {}
     cur.execute("select name from sqlite_master where type='table'")

@@ -1,10 +1,28 @@
-import trend.data_process as dp
-import trend.get_data as gd
-import pandas as pd
+# -*- coding: utf-8 -*-
+"""
+Created on 2019/7/10
+
+@author: Tony She
+
+E-mail: tony_she@yahoo.com
+
+This is the computation module and can use cuda and multiprocessing to
+increase productivity.
+
+Functions:
+
+socket() -- create a new socket object
+"""
+
 import sqlite3 as db
 
+import trend_functions.data_process as data_process
+import trend_functions.get_data as get_data
+import pandas as pd
+
+
 def main():
-    data = gd.getDataFromsql()
+    data = get_data.get_from_sql(name='stock_data')
     resultRaise = pd.DataFrame(columns=[
         'rate of increase', 'increase length', 'rate of decrease',
         'decrease length', 'rate of decrease today', 'change next day', 'bounce back point'
@@ -18,18 +36,19 @@ def main():
     dropdata = {}
     raisedata = {}
     con = db.connect('data-up-and-down.sqlite')
-    #p = Pool(10)
+    # p = Pool(10)
     for i in data:
-        result = dp.computation(data[i], upAndDown, unsureRate, con, i)
-        #p.apply_async(computation, args=(data[i], upAndDown, unsureRate, con, i, ))
-        dropdata[i], raisedata[i] = dp.getInfoForHighLowPoint(result)
+        result = data_process.computation(data[i], upAndDown, unsureRate, con, i)
+        # p.apply_async(computation, args=(data[i], upAndDown, unsureRate, con, i, ))
+        dropdata[i], raisedata[i] = data_process.getInfoForHighLowPoint(result)
         for j in dropdata[i]:
-            resultRaise = dp.getInfoOnRaise(j, resultRaise)
+            resultRaise = data_process.getInfoOnRaise(j, resultRaise)
         for j in raisedata[i]:
-            resultDrop = dp.getInfoOnDrop(j, resultDrop)
+            resultDrop = data_process.getInfoOnDrop(j, resultDrop)
     con.close()
     resultRaise.to_csv('rasie2.csv')
     resultDrop.to_csv('drop2.csv')
 
-if __name__  == '__main__':
+
+if __name__ == '__main__':
     main()
