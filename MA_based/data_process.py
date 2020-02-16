@@ -15,6 +15,7 @@ socket() -- create a new socket object
 """
 
 import sqlite3 as db
+import math
 
 import trend_functions.get_data as get_data
 import pandas as pd
@@ -59,8 +60,66 @@ def cal_MA():
     con.close()
 
 
+def cal_return_simple_strategy():
+    """    """
+
+    result = pd.DataFrame(
+        columns=['stock_id', 'investment length', 'annual return'])
+    data = get_data.get_from_sql(
+        item='trade_date, close, high, low, adj_factor',
+        minimum_data=100)
+    # con = db.connect('D:\\Data\\SMA_result.sqlite')
+
+    for stock in data:
+        df = data[stock]
+        df['adj_close'] = df['close'] * df['adj_factor']
+        for i in [5, 20]:
+            SMA = df['adj_close'].rolling(window=i).mean()
+            df['SMA%s' % str(i)] = SMA.reset_index(drop=True)
+
+        df['lower_than_SMA5_yesterday'] = (df['SMA5'] > df['adj_close']).shift(1)
+        df['higher_than_SMA20_yesterday'] = (df['SMA20'] < df['adj_close']).shift(1)
+
+        # intialize position and cash
+        cash = [1000000]
+        position = [0]
+
+        for index, row in df.iterrows():
+            # Determine if we should buy stock
+            if (row['adj_close'] > row['SMA5'])\
+                    and row['lower_than_SMA5_yesterday']\
+                    and (position[-1] == 0):
+                position.append(math.floor(cash[-1] / row['adj_close']))
+                cash.append(cash[-1] - position[-1] * row['adj_close'])
+
+            # Determin if we should sell stock
+            elif (row['adj_close'] < row['SMA20'])\
+                    and row['higher_than_SMA20_yesterday']\
+                    and (position[-1] != 0):
+                cash.append(cash[-1] + position[-1] * row['adj_close'])
+                position.append(0)
+            else:
+                cash.append(cash[-1] * 1.0001)
+                position.append(position[-1])
+        df['cash'] = cash[1:]
+        df['position'] = position[1:]
+        investment_length = int(
+            (int(df['trade_date'][-1]) - int(df['trade_date'][0]))/10000)
+        df['portfolio value'] = df['cash'] + df['position'] * df['adj_close']
+        ann_return = math.power(
+            df['portfolio value'][-1] / df['portfolio value'][0],
+            1.0 / investment_length
+            )
+        result = result.append({
+            'stock_id': stock,
+            'investment length': investment_length,
+            'annual return': ann_return
+            }, ignore_index=True)
+    result.to_csv('result.csv')
+    return None
+
 def main():
-    cal_MA()
+    cal_return_simple_strategy()
     print('done')
 
 
