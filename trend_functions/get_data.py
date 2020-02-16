@@ -14,22 +14,6 @@ socket are available as methods of the socket object.
 Functions:
 
 socket() -- create a new socket object
-socketpair() -- create a pair of new socket objects [*]
-fromfd() -- create a socket object from an open file descriptor [*]
-fromshare() -- create a socket object from data received from socket.share() [*]
-gethostname() -- return the current hostname
-gethostbyname() -- map a hostname to its IP number
-gethostbyaddr() -- map an IP number or hostname to DNS info
-getservbyname() -- map a service name and a protocol name to a port number
-getprotobyname() -- map a protocol name (e.g. 'tcp') to a number
-ntohs(), ntohl() -- convert 16, 32 bit int from network to host byte order
-htons(), htonl() -- convert 16, 32 bit int from host to network byte order
-inet_aton() -- convert IP addr string (123.45.67.89) to 32-bit packed format
-inet_ntoa() -- convert 32-bit packed format IP to string (123.45.67.89)
-socket.getdefaulttimeout() -- get the default timeout value
-socket.setdefaulttimeout() -- set the default timeout value
-create_connection() -- connects to an address, with an optional timeout and
-                       optional source address.
 """
 
 import logging
@@ -40,7 +24,7 @@ import tushare as ts
 
 
 def get_from_sql(item: str = '*',
-                 name: str = 'stock_data',
+                 name: str = 'data',
                  start_date: str = '19910101',
                  minimum_data: int = 0
                  ) -> dict:
@@ -49,7 +33,7 @@ def get_from_sql(item: str = '*',
 
     Args:
         item (str, optional): Column that return. Defaults to '*'.
-        name (str, optional): SQL's path. Defaults to 'stock_data'.
+        name (str, optional): SQL's path. Defaults to 'data'.
         start_date (str, optional): The starting date of data.
             Defaults to '19910101'.
         minimum_data (int, optional): Reject any stock with data number
@@ -75,9 +59,10 @@ def get_from_sql(item: str = '*',
             sql="SELECT " + item + " FROM '" + stock + "'",
             con=con
             )
-        data[stock] = data[stock][data[stock]['trade_date'] > start_date]
+        # print(data[stock])
         if data[stock].shape[0] < minimum_data:
             data.pop(stock)
+        # data[stock] = data[stock][data[stock]['trade_date'] > start_date]
 
     cur.close()
     con.close()
@@ -136,8 +121,8 @@ def download_all_market_data(sqlname: str = 'data'):
     # Get stock ID of the stock that are now trading(L), suspend trading(P)
     # and delisted(D)
     stock_list = set(pro.stock_basic(exchange='',
-                                    list_status='D',
-                                    fields='ts_code')['ts_code']) \
+                                     list_status='D',
+                                     fields='ts_code')['ts_code']) \
         | set(pro.stock_basic(exchange='',
                               list_status='L',
                               fields='ts_code')['ts_code']) \
@@ -195,27 +180,20 @@ def download_all_market_data(sqlname: str = 'data'):
                     left_on='trade_date'
                     )
             stock_data.dropna(how='all', axis=1, inplace=True)
+            stock_data = stock_data.iloc[::-1]
+            stock_data.reset_index(drop=True, inplace=True)
 
             # Ignore stock that don't have data yet
             if stock_data.shape[0] == 0:
                 continue
 
             # Write in the database
-            if 'trade_date' in stock_data.columns:
-                stock_data.set_index('trade_date', inplace=True)
-                stock_data.to_sql(
-                    name=i,
-                    con=con,
-                    if_exists='replace',
-                    index=True
-                    )
-            else:
-                stock_data.to_sql(
-                    name=i,
-                    con=con,
-                    if_exists='replace',
-                    index=False
-                    )
+            stock_data.to_sql(
+                name=i,
+                con=con,
+                if_exists='replace',
+                index=False
+                )
             con.commit()
         except Exception:
             print(i)
