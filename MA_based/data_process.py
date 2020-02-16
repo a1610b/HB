@@ -85,6 +85,8 @@ def cal_return_simple_strategy():
         position = [0]
 
         for index, row in df.iterrows():
+            # I should add in transaction fee
+
             # Determine if we should buy stock
             if (row['adj_close'] > row['SMA5'])\
                     and row['lower_than_SMA5_yesterday']\
@@ -104,10 +106,14 @@ def cal_return_simple_strategy():
         df['cash'] = cash[1:]
         df['position'] = position[1:]
         investment_length = int(
-            (int(df['trade_date'][-1]) - int(df['trade_date'][0]))/10000)
+            (int(df.iloc[-1, 0]) - int(df.iloc[0, 0]))/10000)
+        if investment_length == 0:
+            investment_length = int(
+                (int(df.iloc[-1, 0]) - int(df.iloc[0, 0]))/100) / 12.0
+
         df['portfolio value'] = df['cash'] + df['position'] * df['adj_close']
-        ann_return = math.power(
-            df['portfolio value'][-1] / df['portfolio value'][0],
+        ann_return = math.pow(
+            df.iloc[-1, -1] / df.iloc[0, -1],
             1.0 / investment_length
             )
         result = result.append({
