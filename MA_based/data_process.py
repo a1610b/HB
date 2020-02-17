@@ -62,12 +62,14 @@ def cal_MA():
 
 def cal_return_simple_strategy():
     """    """
+    buy_fee = 0.0003
+    sell_fee = 0.0013
 
     result = pd.DataFrame(
         columns=['stock_id', 'investment length', 'annual return'])
     data = get_data.get_from_sql(
-        item='trade_date, close, high, low, adj_factor',
-        minimum_data=100)
+        item='trade_date, close, high, low, adj_factor, pct_chg',
+        minimum_data=300)
     # con = db.connect('D:\\Data\\SMA_result.sqlite')
 
     for stock in data:
@@ -77,32 +79,37 @@ def cal_return_simple_strategy():
             SMA = df['adj_close'].rolling(window=i).mean()
             df['SMA%s' % str(i)] = SMA.reset_index(drop=True)
 
-        df['lower_than_SMA5_yesterday'] = (df['SMA5'] > df['adj_close']).shift(1)
-        df['higher_than_SMA20_yesterday'] = (df['SMA20'] < df['adj_close']).shift(1)
+        df['lower_than_SMA5_yes'] = (df['SMA5'] > df['adj_close']).shift(1)
+        df['higher_than_SMA20_yes'] = (df['SMA20'] < df['adj_close']).shift(1)
 
         # intialize position and cash
         cash = [1000000]
         position = [0]
 
         for index, row in df.iterrows():
-            # I should add in transaction fee
-
             # Determine if we should buy stock
             if (row['adj_close'] > row['SMA5'])\
-                    and row['lower_than_SMA5_yesterday']\
-                    and (position[-1] == 0):
-                position.append(math.floor(cash[-1] / row['adj_close']))
-                cash.append(cash[-1] - position[-1] * row['adj_close'])
+                    and row['lower_than_SMA5_yes']\
+                    and (position[-1] == 0)\
+                    and abs(row['pct_chg']) < 9.8:
+                buy_share = math.floor(
+                    cash[-1] / row['adj_close'] / (1 + buy_fee))
+                position.append(buy_share)
+                cash.append(
+                    cash[-1] - buy_share * row['adj_close'] * (1 + buy_fee))
 
             # Determin if we should sell stock
             elif (row['adj_close'] < row['SMA20'])\
-                    and row['higher_than_SMA20_yesterday']\
-                    and (position[-1] != 0):
-                cash.append(cash[-1] + position[-1] * row['adj_close'])
+                    and row['higher_than_SMA20_yes']\
+                    and (position[-1] != 0)\
+                    and abs(row['pct_chg']) < 9.8:
+                cash.append(cash[-1]
+                            + position[-1] * row['adj_close'] * (1 - sell_fee))
                 position.append(0)
             else:
                 cash.append(cash[-1] * 1.0001)
                 position.append(position[-1])
+
         df['cash'] = cash[1:]
         df['position'] = position[1:]
         investment_length = int(
@@ -121,8 +128,9 @@ def cal_return_simple_strategy():
             'investment length': investment_length,
             'annual return': ann_return
             }, ignore_index=True)
-    result.to_csv('result.csv')
+    result.to_csv('result_withfee.csv')
     return None
+
 
 def main():
     cal_return_simple_strategy()
